@@ -1,2 +1,2 @@
 # syncdir
-command-line Python scrtipt for comparing and synchronizing 2 directories
+command-line Python script for comparing and synchronizing 2 directories
