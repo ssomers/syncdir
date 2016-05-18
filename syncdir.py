@@ -9,7 +9,10 @@ from optparse import OptionParser
 
 class Chooser:
     def ask(self, prompt):
-        return input(prompt)
+        try:
+            return raw_input(prompt)
+        except NameError:
+            return input(prompt)
 
 class Tracer:
     def __init__(self, out):
