@@ -177,31 +177,31 @@ class MasterSession(Session):
         self.chooser = chooser
         self.clean = clean
         if ignore_time:
-            self.actionChangedTimestamp = Action("has different time")
+            self.actionChangedTimestamp = Action(self.tracer, "has different time")
         if not clean:
-            self.actionNewDir = CreateTgtDir("is new", "create")
-            self.actionOldDir = RemoveTgtDir("has disappeared", "descend & remove")
-            self.actionNewFile = CopyFile("is new", "create")
-            self.actionNewLink = CopyLink("is new", "link")
-            self.actionOldFile = RemoveTgtFile("has disappeared", "remove")
-            self.actionDuplicateFile = Action("has not changed")
+            self.actionNewDir = CreateTgtDir(self.tracer, "is new", "create")
+            self.actionOldDir = RemoveTgtDir(self.tracer, "has disappeared", "descend & remove")
+            self.actionNewFile = CopyFile(self.tracer, "is new", "create")
+            self.actionNewLink = CopyLink(self.tracer, "is new", "link")
+            self.actionOldFile = RemoveTgtFile(self.tracer, "has disappeared", "remove")
+            self.actionDuplicateFile = Action(self.tracer, "has not changed")
             if not ignore_time:
-                self.actionChangedTimestamp = CopyTimestamp("has different time", "touch")
-            self.actionChangedFileUnknown = CopyFile("has changed somehow", "overwrite")
-            self.actionChangedFileKnown = CopyFile("has changed as shown", "overwrite")
-            self.actionChangedLink = CopyLink("has changed as shown", "relink")
+                self.actionChangedTimestamp = CopyTimestamp(self.tracer, "has different time", "touch")
+            self.actionChangedFileUnknown = CopyFile(self.tracer, "has changed somehow", "overwrite")
+            self.actionChangedFileKnown = CopyFile(self.tracer, "has changed as shown", "overwrite")
+            self.actionChangedLink = CopyLink(self.tracer, "has changed as shown", "relink")
         else:
-            self.actionNewDir = RemoveSrcDir("is new", "descend")
-            self.actionOldDir = Action("has disappeared")
-            self.actionNewFile = RemoveSrcFile("is new", "remove")
-            self.actionNewLink = RemoveSrcFile("is new", "remove")
-            self.actionOldFile = Action("has disappeared")
-            self.actionDuplicateFile = RemoveSrcFile("has not changed", "remove")
+            self.actionNewDir = RemoveSrcDir(self.tracer, "is new", "descend")
+            self.actionOldDir = Action(self.tracer, "has disappeared")
+            self.actionNewFile = RemoveSrcFile(self.tracer, "is new", "remove")
+            self.actionNewLink = RemoveSrcFile(self.tracer, "is new", "remove")
+            self.actionOldFile = Action(self.tracer, "has disappeared")
+            self.actionDuplicateFile = RemoveSrcFile(self.tracer, "has not changed", "remove")
             if not ignore_time:
-                self.actionChangedTimestamp = RemoveSrcFile("has different time", "remove")
-            self.actionChangedFileUnknown = RemoveSrcFile("has changed somehow", "remove")
-            self.actionChangedFileKnown = RemoveSrcFile("has changed as shown", "remove")
-            self.actionChangedLink = RemoveSrcFile("has changed as shown", "remove")
+                self.actionChangedTimestamp = RemoveSrcFile(self.tracer, "has different time", "remove")
+            self.actionChangedFileUnknown = RemoveSrcFile(self.tracer, "has changed somehow", "remove")
+            self.actionChangedFileKnown = RemoveSrcFile(self.tracer, "has changed as shown", "remove")
+            self.actionChangedLink = RemoveSrcFile(self.tracer, "has changed as shown", "remove")
 
         if do_everything or do_nothing:
             self.setDecision(self.actionNewDir, do_everything)
@@ -341,22 +341,27 @@ class ComPair:
             return master.actionChangedFileUnknown
         if blocks > 1:
             tracer.trace(self.subject + ' ')
-            with open(self.getPathA(), 'rb') as fileA:
-                with open(self.getPathB(), 'rb') as fileB:
-                    equal = True
-                    progress = 0
-                    for block in range(blocks):
-                        update = False
-                        while block * PROGRESSION >= progress * blocks:
-                            progress += 1
-                            update = True
-                        if update:
-                            sys.stdout.write(str(PROGRESSION - progress) + '\b')
-                        b1 = fileA.read(BUFSIZE)
-                        b2 = fileB.read(BUFSIZE)
-                        equal = b1 is not None and b2 is not None and b1 == b2
-                        if not equal:
-                            break
+            try:
+                with open(self.getPathA(), 'rb') as fileA:
+                    with open(self.getPathB(), 'rb') as fileB:
+                        equal = True
+                        progress = 0
+                        for block in range(blocks):
+                            update = False
+                            while block * PROGRESSION >= progress * blocks:
+                                progress += 1
+                                update = True
+                            if update:
+                                sys.stdout.write(str(PROGRESSION - progress) + '\b')
+                            b1 = fileA.read(BUFSIZE)
+                            b2 = fileB.read(BUFSIZE)
+                            equal = b1 is not None and b2 is not None and b1 == b2
+                            if not equal:
+                                break
+            except EnvironmentError:
+                e = sys.exc_info()[1]
+                tracer.report(e.filename + ": " + e.strerror)
+                return None
             if equal:
                 if equaltime:
                     return master.actionDuplicateFile
@@ -372,7 +377,7 @@ class ComPair:
                 fileA.close()
             except EnvironmentError:
                 e = sys.exc_info()[1]
-                tracer.report(e.strerror)
+                tracer.report(e.filename + ": " + e.strerror)
                 return None
             try:
                 fileB = open(self.getPathB())
@@ -380,7 +385,7 @@ class ComPair:
                 fileB.close()
             except EnvironmentError:
                 e = sys.exc_info()[1]
-                tracer.report(e.strerror)
+                tracer.report(e.filename + ": " + e.strerror)
                 return None
             if textA == textB:
                 if equaltime:
@@ -412,7 +417,8 @@ class ComPair:
 
 
 class Action:
-    def __init__(self, reason, treatment=None):
+    def __init__(self, tracer, reason, treatment=None):
+        self.tracer = tracer
         self.reason = reason
         self.treatment = treatment
 
@@ -438,7 +444,9 @@ class RemoveTgtDir(Action):
         try:
             os.rmdir(compair.getPathB())
         except EnvironmentError:
-            pass
+            e = sys.exc_info()[1]
+            self.tracer.report(e.filename + ": " + e.strerror)
+            return False
         compair.setStatB()
         return True
 
@@ -449,10 +457,16 @@ class CopyTimestamp(Action):
 
 class CopyFile(Action):
     def perform(self, compair):
-        shutil.copyfile(compair.getPathA(), compair.getPathB())
-        os.utime(compair.getPathB(), (compair.statA[stat.ST_ATIME], compair.statA[stat.ST_MTIME]))
-        compair.setStatB()
-        return True
+        try:
+            shutil.copyfile(compair.getPathA(), compair.getPathB())
+            os.utime(compair.getPathB(), (compair.statA[stat.ST_ATIME], compair.statA[stat.ST_MTIME]))
+            compair.setStatB()
+        except EnvironmentError:
+            e = sys.exc_info()[1]
+            self.tracer.report(e.filename + ": " + e.strerror)
+            return False
+        else:
+            return True
 
 class CopyLink(Action):
     def perform(self, compair):
@@ -460,14 +474,21 @@ class CopyLink(Action):
         try:
             os.unlink(compair.getPathB())
         except EnvironmentError:
-            pass
+            e = sys.exc_info()[1]
+            self.tracer.report(e.filename + ": " + e.strerror)
+            return False
         os.symlink(link, compair.getPathB())
         compair.setStatB()
         return True
 
 class RemoveTgtFile(Action):
     def perform(self, compair):
-        os.unlink(compair.getPathB())
+        try:
+            os.unlink(compair.getPathB())
+        except EnvironmentError:
+            e = sys.exc_info()[1]
+            self.tracer.report(e.filename + ": " + e.strerror)
+            return False
         compair.setStatB()
         return True
 
