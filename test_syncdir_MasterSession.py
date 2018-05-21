@@ -4,8 +4,18 @@ import io
 import os
 import stat
 import syncdir
+import sys
 import tempfile
 import unittest
+
+TIMEVAL1 = 1234567890
+TIMEVAL2 = 1234567895
+if sys.platform == "linux":
+    TIMESTR1 = " 9 Sat Feb 14 00:31:30 2009"
+    TIMESTR2 = " 9 Sat Feb 14 00:31:35 2009"
+else:
+    TIMESTR1 = "10 Sat Feb 14 00:31:30 2009"
+    TIMESTR2 = "10 Sat Feb 14 00:31:35 2009"
 
 class Params:
     pass
@@ -88,7 +98,7 @@ class MasterSessionTestCase_2_files_same_name_size_time(MasterSessionTestCase):
         with open(os.path.join(self.dst.name, "phile"), "w") as f:
             f.write("rhs contents\n") # same file size as src file
         for folder in self.src, self.dst:
-            os.utime(os.path.join(folder.name, "phile"), (1234567890,1234567890))
+            os.utime(os.path.join(folder.name, "phile"), (TIMEVAL1,TIMEVAL1))
         self._check_folders(cleaned=False, copied=False)
     def check(self):
         if self.params.trust_time:
@@ -128,7 +138,7 @@ class MasterSessionTestCase_2_files_same_name_size(MasterSessionTestCase):
             f.write("lhs contents\n")
         with open(os.path.join(self.dst.name, "phile"), "w") as f:
             f.write("rhs contents\n") # same file size as src file
-        os.utime(os.path.join(self.src.name, "phile"), (1234567890,1234567890))
+        os.utime(os.path.join(self.src.name, "phile"), (TIMEVAL1,TIMEVAL1))
         self._check_folders(cleaned=False, copied=False)
     def check(self):
         out = self.out.getvalue().split('\n\n')
@@ -162,8 +172,8 @@ class MasterSessionTestCase_2_files_same_name_contents(MasterSessionTestCase):
             f.write("contents\n")
         with open(os.path.join(self.dst.name, "phile"), "w") as f:
             f.write("contents\n")
-        os.utime(os.path.join(self.src.name, "phile"), (1234567890,1234567890))
-        os.utime(os.path.join(self.dst.name, "phile"), (1234567895,1234567895))
+        os.utime(os.path.join(self.src.name, "phile"), (TIMEVAL1,TIMEVAL1))
+        os.utime(os.path.join(self.dst.name, "phile"), (TIMEVAL2,TIMEVAL2))
         self._check_folders(cleaned=False, touched=False)
     def check(self):
         if self.params.ignore_time:
@@ -173,8 +183,8 @@ class MasterSessionTestCase_2_files_same_name_contents(MasterSessionTestCase):
                 self.assertEqual(self.out.getvalue(), "\rphile has not changed")
         else:
             out = self.out.getvalue().split('\n')
-            self.assertEqual(out[0], "        10 Sat Feb 14 00:31:30 2009 %s" % self.src.name)
-            self.assertEqual(out[1], "        10 Sat Feb 14 00:31:35 2009 %s" % self.dst.name)
+            self.assertEqual(out[0], "        %s %s" % (TIMESTR1, self.src.name))
+            self.assertEqual(out[1], "        %s %s" % (TIMESTR2, self.dst.name))
             if self.params.do_everything or self.params.do_nothing:
                 if self.params.clean:
                     self.assertEqual(out[2], "phile has different time, remove")
@@ -197,14 +207,14 @@ class MasterSessionTestCase_2_files_same_name_contents(MasterSessionTestCase):
             self.assertEqual(os.listdir(self.src.name), ["phile"])
             with open(os.path.join(self.src.name, "phile"), "r") as f:
                 self.assertEqual(f.read(), "contents\n")
-            self.assertEqual(os.stat(os.path.join(self.src.name, "phile"))[stat.ST_ATIME], 1234567890)
+            self.assertEqual(os.stat(os.path.join(self.src.name, "phile"))[stat.ST_MTIME], TIMEVAL1)
         self.assertEqual(os.listdir(self.dst.name), ["phile"])
         with open(os.path.join(self.dst.name, "phile"), "r") as f:
             self.assertEqual(f.read(), "contents\n")
         if touched:
-            self.assertEqual(os.stat(os.path.join(self.dst.name, "phile"))[stat.ST_ATIME], 1234567890)
+            self.assertEqual(os.stat(os.path.join(self.dst.name, "phile"))[stat.ST_MTIME], TIMEVAL1)
         else:
-            self.assertEqual(os.stat(os.path.join(self.dst.name, "phile"))[stat.ST_ATIME], 1234567895)
+            self.assertEqual(os.stat(os.path.join(self.dst.name, "phile"))[stat.ST_MTIME], TIMEVAL2)
 
 class MasterSessionTestCase_2_different_files(MasterSessionTestCase):
     def setUp(self):
