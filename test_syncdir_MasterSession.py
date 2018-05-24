@@ -274,9 +274,9 @@ class MasterSessionTestCase_2_folders(MasterSessionTestCase):
             if folder is self.src and cleaned:
                 self.assertEqual(os.listdir(folder.name), [])
             else:
-                self.assertEqual(os.listdir(folder.name), ["pholder A", "pholder B"])
-                self.assertEqual(os.listdir(os.path.join(folder.name, "pholder A")), ["phile 1", "phile 2"])
-                self.assertEqual(os.listdir(os.path.join(folder.name, "pholder B")), ["phile 1", "phile 2"])
+                self.assertEqual(sorted(os.listdir(folder.name)), ["pholder A", "pholder B"])
+                self.assertEqual(sorted(os.listdir(os.path.join(folder.name, "pholder A"))), ["phile 1", "phile 2"])
+                self.assertEqual(sorted(os.listdir(os.path.join(folder.name, "pholder B"))), ["phile 1", "phile 2"])
                 for philename in "phile 1", "phile 2":
                     if folder is self.src or copied:
                         with open(os.path.join(folder.name, "pholder A", philename), "r") as f:
